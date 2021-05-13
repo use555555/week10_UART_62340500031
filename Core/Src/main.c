@@ -1,28 +1,29 @@
 /* USER CODE BEGIN Header */
 /**
-  ******************************************************************************
-  * @file           : main.c
-  * @brief          : Main program body
-  ******************************************************************************
-  * @attention
-  *
-  * <h2><center>&copy; Copyright (c) 2021 STMicroelectronics.
-  * All rights reserved.</center></h2>
-  *
-  * This software component is licensed by ST under BSD 3-Clause license,
-  * the "License"; You may not use this file except in compliance with the
-  * License. You may obtain a copy of the License at:
-  *                        opensource.org/licenses/BSD-3-Clause
-  *
-  ******************************************************************************
-  */
+ ******************************************************************************
+ * @file           : main.c
+ * @brief          : Main program body
+ ******************************************************************************
+ * @attention
+ *
+ * <h2><center>&copy; Copyright (c) 2021 STMicroelectronics.
+ * All rights reserved.</center></h2>
+ *
+ * This software component is licensed by ST under BSD 3-Clause license,
+ * the "License"; You may not use this file except in compliance with the
+ * License. You may obtain a copy of the License at:
+ *                        opensource.org/licenses/BSD-3-Clause
+ *
+ ******************************************************************************
+ */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include <stdio.h>
+#include <string.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -43,7 +44,32 @@
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
+enum
+{
 
+	System_Start = 0,
+	System_Print_Main = 1,
+	System_Input_Main = 2,
+	System_Print_One = 3,
+	System_Input_One = 4,
+	System_Print_Two = 5,
+	System_Input_Two = 6
+
+};
+
+
+char TxDataBuffer[32] =
+{ 0 };
+char RxDataBuffer[32] =
+{ 0 };
+
+int LED_State = 1;
+int LED_Frequency = 1;
+float LED_Half_Period = 0;
+uint32_t TimeStamp = 0;
+uint8_t System_State = System_Start;
+
+uint8_t Button_State_Bank[2] = {1,1};
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -51,7 +77,8 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART2_UART_Init(void);
 /* USER CODE BEGIN PFP */
-
+void UARTRecieveAndResponsePolling();
+int16_t UARTRecieveIT();
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -89,17 +116,174 @@ int main(void)
   MX_GPIO_Init();
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
-
+  {
+  char temp[]="\r\n\r\nHELLO WORLD\r\n please type something to test UART\r\n\r\n\r\n";
+  HAL_UART_Transmit(&huart2, (uint8_t*)temp, strlen(temp),10);
+  }
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  while (1)
-  {
+	while (1)
+	{
+		/*Method 1 Polling Mode*/
+
+//		UARTRecieveAndResponsePolling();
+
+		/*Method 2 Interrupt Mode*/
+		HAL_UART_Receive_IT(&huart2,  (uint8_t*)RxDataBuffer, 32);
+
+		/*Method 2 W/ 1 Char Received*/
+		int16_t inputchar = UARTRecieveIT();
+		if(inputchar!=-1)
+		{
+
+			sprintf(TxDataBuffer, "\r\nReceivedChar:[%c]\r\n", inputchar);
+			HAL_UART_Transmit(&huart2, (uint8_t*)TxDataBuffer, strlen(TxDataBuffer), 1000);
+		}
+
+		switch(System_State)
+		{
+		case System_Start:
+			System_State = System_Print_Main;
+			break;
+
+		case System_Print_Main:
+			sprintf(TxDataBuffer, "[MainMenu] \r\n 1. Led controller \r\n 2. Button State \r\n\r\n\r\n");
+			HAL_UART_Transmit(&huart2, (uint8_t*)TxDataBuffer, strlen(TxDataBuffer), 1000);
+			System_State = System_Input_Main;
+			break;
+		case System_Input_Main:
+			switch(inputchar)
+			{
+			case '1':
+				System_State = System_Print_One;
+				break;
+			case '2':
+				System_State = System_Print_Two;
+				break;
+			case -1:
+				break;
+			default:
+				System_State = System_Print_Main;
+				break;
+			}
+			break;
+
+			case System_Print_One:
+				sprintf(TxDataBuffer, "[Led controller] \r\n a. +1 Hz \r\n s. -1 Hz \r\n d. On/Off \r\n x. Back \r\n\r\n\r\n");
+				HAL_UART_Transmit(&huart2, (uint8_t*)TxDataBuffer, strlen(TxDataBuffer), 1000);
+				System_State = System_Input_One;
+				break;
+			case System_Input_One:
+				switch(inputchar)
+				{
+				case 'a':
+					if(LED_Frequency + 1 <= 10)
+					{
+						LED_Frequency += 1;
+						sprintf(TxDataBuffer, "LED Frequency is %d Hz \r\n" , LED_Frequency);
+						HAL_UART_Transmit(&huart2, (uint8_t*)TxDataBuffer, strlen(TxDataBuffer), 1000);
+					}
+					else
+					{
+						sprintf(TxDataBuffer, "LED Frequency is at Maximum \r\n");
+						HAL_UART_Transmit(&huart2, (uint8_t*)TxDataBuffer, strlen(TxDataBuffer), 1000);
+					}
+					System_State = System_Print_One;
+					break;
+				case 's':
+					if(LED_Frequency - 1 >= 0)
+					{
+						LED_Frequency -= 1;
+						sprintf(TxDataBuffer, "LED Frequency is %d Hz \r\n" , LED_Frequency);
+						HAL_UART_Transmit(&huart2, (uint8_t*)TxDataBuffer, strlen(TxDataBuffer), 1000);
+					}
+					else
+					{
+						sprintf(TxDataBuffer, "LED Frequency is at minimum \r\n");
+						HAL_UART_Transmit(&huart2, (uint8_t*)TxDataBuffer, strlen(TxDataBuffer), 1000);
+					}
+					System_State = System_Print_One;
+					break;
+				case 'd':
+					if(LED_State == 1)
+					{
+						LED_State = 0;
+						HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin,GPIO_PIN_RESET);
+						sprintf(TxDataBuffer, "Turned LED Off \r\n");
+						HAL_UART_Transmit(&huart2, (uint8_t*)TxDataBuffer, strlen(TxDataBuffer), 1000);
+					}
+					else
+					{
+						LED_State = 1;
+						sprintf(TxDataBuffer, "Turned LED On \r\n");
+						HAL_UART_Transmit(&huart2, (uint8_t*)TxDataBuffer, strlen(TxDataBuffer), 1000);
+					}
+					System_State = System_Print_One;
+					break;
+				case 'x':
+					System_State = System_Print_Main;
+					break;
+				case -1:
+					break;
+				default:
+					System_State = System_Print_One;
+					break;
+				}
+				break;
+
+				case System_Print_Two:
+					sprintf(TxDataBuffer, "[Button State] \r\n x. Back \r\n\r\n\r\n");
+					HAL_UART_Transmit(&huart2, (uint8_t*)TxDataBuffer, strlen(TxDataBuffer), 1000);
+					System_State = System_Input_Two;
+					break;
+				case System_Input_Two:
+					Button_State_Bank[0] = HAL_GPIO_ReadPin(B1_GPIO_Port, B1_Pin);
+					if(Button_State_Bank[0] == 0 && Button_State_Bank[1] == 1)
+					{
+						sprintf(TxDataBuffer, "Pressed \r\n");
+						HAL_UART_Transmit(&huart2, (uint8_t*)TxDataBuffer, strlen(TxDataBuffer), 1000);
+						System_State = System_Print_Two;
+					}
+					else if(Button_State_Bank[0] == 1 && Button_State_Bank[1] == 0)
+					{
+						sprintf(TxDataBuffer, "Released \r\n");
+						HAL_UART_Transmit(&huart2, (uint8_t*)TxDataBuffer, strlen(TxDataBuffer), 1000);
+						System_State = System_Print_Two;
+					}
+					Button_State_Bank[1] = Button_State_Bank[0];
+					switch(inputchar)
+					{
+					case 'x':
+						System_State = System_Print_Main;
+						break;
+					case -1:
+						break;
+					default:
+						System_State = System_Print_Two;
+						break;
+					}
+					break;
+
+		}
+
+		LED_Half_Period = ((1.0/LED_Frequency)/2.0)*1000.0;
+
+		/*This section just simulate Work Load*/
+		if(LED_State == 1 && LED_Frequency != 0)
+		{
+			if(HAL_GetTick()-TimeStamp > LED_Half_Period)
+			{
+				TimeStamp = HAL_GetTick();
+				HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
+			}
+		}
+
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-  }
+	}
   /* USER CODE END 3 */
 }
 
@@ -214,7 +398,35 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+void UARTRecieveAndResponsePolling()
+{
+	char Recieve[32]={0};
 
+	HAL_UART_Receive(&huart2, (uint8_t*)Recieve, 4, 1000);
+
+	sprintf(TxDataBuffer, "Received:[%s]\r\n", Recieve);
+	HAL_UART_Transmit(&huart2, (uint8_t*)TxDataBuffer, strlen(TxDataBuffer), 1000);
+
+}
+
+
+int16_t UARTRecieveIT()
+{
+	static uint32_t dataPos =0;
+	int16_t data=-1;
+	if(huart2.RxXferSize - huart2.RxXferCount!=dataPos)
+	{
+		data=RxDataBuffer[dataPos];
+		dataPos= (dataPos+1)%huart2.RxXferSize;
+	}
+	return data;
+}
+
+//void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+//{
+//	sprintf(TxDataBuffer, "Received:[%s]\r\n", RxDataBuffer);
+//	HAL_UART_Transmit(&huart2, (uint8_t*)TxDataBuffer, strlen(TxDataBuffer), 1000);
+//}
 /* USER CODE END 4 */
 
 /**
@@ -224,11 +436,11 @@ static void MX_GPIO_Init(void)
 void Error_Handler(void)
 {
   /* USER CODE BEGIN Error_Handler_Debug */
-  /* User can add his own implementation to report the HAL error return state */
-  __disable_irq();
-  while (1)
-  {
-  }
+	/* User can add his own implementation to report the HAL error return state */
+	__disable_irq();
+	while (1)
+	{
+	}
   /* USER CODE END Error_Handler_Debug */
 }
 
