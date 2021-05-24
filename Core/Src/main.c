@@ -58,7 +58,7 @@ enum
 };
 
 
-char TxDataBuffer[32] =
+char TxDataBuffer[100] =
 { 0 };
 char RxDataBuffer[32] =
 { 0 };
@@ -77,7 +77,7 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART2_UART_Init(void);
 /* USER CODE BEGIN PFP */
-void UARTRecieveAndResponsePolling();
+//void UARTRecieveAndResponsePolling();
 int16_t UARTRecieveIT();
 /* USER CODE END PFP */
 
@@ -137,10 +137,12 @@ int main(void)
 		int16_t inputchar = UARTRecieveIT();
 		if(inputchar!=-1)
 		{
-
+			char TxDataBuffer[100] = { 0 };
 			sprintf(TxDataBuffer, "\r\nReceivedChar:[%c]\r\n", inputchar);
 			HAL_UART_Transmit(&huart2, (uint8_t*)TxDataBuffer, strlen(TxDataBuffer), 1000);
 		}
+
+		char TxDataBuffer[100] = { 0 };
 
 		switch(System_State)
 		{
@@ -165,6 +167,8 @@ int main(void)
 			case -1:
 				break;
 			default:
+				sprintf(TxDataBuffer, "Please press the correct button \r\n");
+				HAL_UART_Transmit(&huart2, (uint8_t*)TxDataBuffer, strlen(TxDataBuffer), 1000);
 				System_State = System_Print_Main;
 				break;
 			}
@@ -179,7 +183,7 @@ int main(void)
 				switch(inputchar)
 				{
 				case 'a':
-					if(LED_Frequency + 1 <= 10)
+					if(LED_Frequency + 1 <= 30)
 					{
 						LED_Frequency += 1;
 						sprintf(TxDataBuffer, "LED Frequency is %d Hz \r\n" , LED_Frequency);
@@ -228,6 +232,8 @@ int main(void)
 				case -1:
 					break;
 				default:
+					sprintf(TxDataBuffer, "Please press the correct button \r\n");
+					HAL_UART_Transmit(&huart2, (uint8_t*)TxDataBuffer, strlen(TxDataBuffer), 1000);
 					System_State = System_Print_One;
 					break;
 				}
@@ -261,6 +267,8 @@ int main(void)
 					case -1:
 						break;
 					default:
+						sprintf(TxDataBuffer, "Please press the correct button \r\n");
+						HAL_UART_Transmit(&huart2, (uint8_t*)TxDataBuffer, strlen(TxDataBuffer), 1000);
 						System_State = System_Print_Two;
 						break;
 					}
@@ -398,16 +406,16 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-void UARTRecieveAndResponsePolling()
-{
-	char Recieve[32]={0};
-
-	HAL_UART_Receive(&huart2, (uint8_t*)Recieve, 4, 1000);
-
-	sprintf(TxDataBuffer, "Received:[%s]\r\n", Recieve);
-	HAL_UART_Transmit(&huart2, (uint8_t*)TxDataBuffer, strlen(TxDataBuffer), 1000);
-
-}
+//void UARTRecieveAndResponsePolling()
+//{
+//	char Recieve[32]={0};
+//
+//	HAL_UART_Receive(&huart2, (uint8_t*)Recieve, 4, 1000);
+//
+//	sprintf(TxDataBuffer, "Received:[%s]\r\n", Recieve);
+//	HAL_UART_Transmit(&huart2, (uint8_t*)TxDataBuffer, strlen(TxDataBuffer), 1000);
+//
+//}
 
 
 int16_t UARTRecieveIT()
